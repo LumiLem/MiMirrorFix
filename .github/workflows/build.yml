@@ -1,0 +1,65 @@
+name: Build MiMirrorFix APKs
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.4'
+
+    - name: Build with Gradle
+      run: gradle assembleRelease
+
+    - name: Upload Traditional APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MiMirrorFix-Traditional
+        path: module-traditional/build/outputs/apk/release/*.apk
+
+    - name: Upload LibXposed API 102 APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MiMirrorFix-LibXposed-API102
+        path: module-libxposed/build/outputs/apk/release/*.apk
+
+    - name: Publish to GitHub Release
+      if: github.event_name != 'pull_request'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: "v1.0"
+        name: "修复小米跨设备通知 v1.0"
+        body: |
+          ### 修复小米跨设备通知 (MiMirrorFix) v1.0
+
+          > **作者**：柠小芒  
+          > **描述**：修复低版本 HyperOS/MIUI 跨屏协同通知小窗镜像连接及锁屏密码误报问题
+
+          #### 包含产物说明：
+          - **module-libxposed-release.apk**：基于现代化 LibXposed API 102 架构（推荐）
+          - **module-traditional-release.apk**：基于传统 Xposed API 架构
+        files: |
+          module-traditional/build/outputs/apk/release/*.apk
+          module-libxposed/build/outputs/apk/release/*.apk
+        draft: false
+        prerelease: false

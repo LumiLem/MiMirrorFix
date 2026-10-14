@@ -1,0 +1,6 @@
+name=修复小米跨设备通知
+version=1.0
+versionCode=1
+description=修复低版本 HyperOS/MIUI 跨屏协同通知小窗镜像连接及锁屏密码误报问题
+author=柠小芒
+targetApiVersion=102

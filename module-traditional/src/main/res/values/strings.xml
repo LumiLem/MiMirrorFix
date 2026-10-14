@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">修复小米跨设备通知</string>
+    <string name="xposed_desc">修复低版本 HyperOS/MIUI 跨屏协同通知小窗镜像连接及锁屏密码误报问题</string>
+    <string name="xposed_author">柠小芒</string>
+</resources>
