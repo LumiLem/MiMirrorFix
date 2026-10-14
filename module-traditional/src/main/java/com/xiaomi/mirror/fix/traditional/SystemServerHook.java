@@ -5,6 +5,7 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
+import java.lang.reflect.Method;
 
 public class SystemServerHook {
 
@@ -13,6 +14,7 @@ public class SystemServerHook {
     public static void hook(ClassLoader cl) {
         hookMoveRootTaskToDisplay(cl);
         hookEnforceTaskPermission(cl);
+        hookIsCallerAllowedToLaunchOnDisplay(cl);
     }
 
     /**
@@ -84,6 +86,25 @@ public class SystemServerHook {
             XposedBridge.log(TAG + "Hooked ActivityTaskManagerService.enforceTaskPermission successfully.");
         } catch (Throwable t) {
             XposedBridge.log(TAG + "Failed to hook enforceTaskPermission: " + t.getMessage());
+        }
+    }
+
+    /**
+     * 3. 解决在虚拟屏幕 (VirtualDisplay) 上拉起 Activity 时的 INTERNAL_SYSTEM_WINDOW 权限检查拦截
+     * ActivityTaskSupervisor.isCallerAllowedToLaunchOnDisplay(int callingPid, int callingUid, int launchDisplayId, ActivityInfo aInfo)
+     * 若未授权则拒绝在副屏/虚拟屏幕上启动目标 Activity，直接返回 true 放行。
+     */
+    private static void hookIsCallerAllowedToLaunchOnDisplay(ClassLoader cl) {
+        try {
+            Class<?> atsClass = XposedHelpers.findClass("com.android.server.wm.ActivityTaskSupervisor", cl);
+            for (Method m : atsClass.getDeclaredMethods()) {
+                if ("isCallerAllowedToLaunchOnDisplay".equals(m.getName()) && m.getReturnType() == boolean.class) {
+                    XposedBridge.hookMethod(m, XC_MethodReplacement.returnConstant(true));
+                    XposedBridge.log(TAG + "Hooked ActivityTaskSupervisor." + m.getName() + " -> true");
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "Failed to hook isCallerAllowedToLaunchOnDisplay: " + t.getMessage());
         }
     }
 }

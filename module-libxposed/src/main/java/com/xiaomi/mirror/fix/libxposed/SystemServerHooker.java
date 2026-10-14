@@ -12,6 +12,7 @@ public class SystemServerHooker {
     public static void hook(XposedModule module, ClassLoader cl) {
         hookMoveRootTaskToDisplay(module, cl);
         hookEnforceTaskPermission(module, cl);
+        hookIsCallerAllowedToLaunchOnDisplay(module, cl);
     }
 
     /**
@@ -87,6 +88,27 @@ public class SystemServerHooker {
             MainModule.log("Hooked ActivityTaskManagerService.enforceTaskPermission successfully.");
         } catch (Throwable t) {
             MainModule.log("Failed to hook enforceTaskPermission: " + t.getMessage());
+        }
+    }
+
+    /**
+     * 3. 解决在虚拟屏幕 (VirtualDisplay) 上拉起 Activity 时的 INTERNAL_SYSTEM_WINDOW 权限检查拦截
+     * 拦截 ActivityTaskSupervisor.isCallerAllowedToLaunchOnDisplay(...)，直接返回 true 放行。
+     */
+    private static void hookIsCallerAllowedToLaunchOnDisplay(XposedModule module, ClassLoader cl) {
+        try {
+            Class<?> atsClass = cl.loadClass("com.android.server.wm.ActivityTaskSupervisor");
+            for (Method m : atsClass.getDeclaredMethods()) {
+                if ("isCallerAllowedToLaunchOnDisplay".equals(m.getName()) && m.getReturnType() == boolean.class) {
+                    m.setAccessible(true);
+                    module.hook(m)
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(chain -> true);
+                    MainModule.log("Hooked ActivityTaskSupervisor." + m.getName() + " -> true");
+                }
+            }
+        } catch (Throwable t) {
+            MainModule.log("Failed to hook isCallerAllowedToLaunchOnDisplay: " + t.getMessage());
         }
     }
 }

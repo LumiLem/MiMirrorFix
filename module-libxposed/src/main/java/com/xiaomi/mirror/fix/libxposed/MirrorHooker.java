@@ -10,6 +10,7 @@ public class MirrorHooker {
     public static void hook(XposedModule module, ClassLoader cl) {
         hookLockPasswordCheck(module, cl);
         hookTransitionReadyState(module, cl);
+        hookSupportSubScreen(module, cl);
     }
 
     /**
@@ -93,6 +94,43 @@ public class MirrorHooker {
             } catch (Throwable t) {
                 MainModule.log("Dynamic scan failed: " + t.getMessage());
             }
+        }
+    }
+
+    /**
+     * 3. 解决“openAppScreen fail, is not SupportSubScreen”导致跨屏从小窗连接后消失的问题
+     * 将 W3.c.o() 强制返回 true，并将 Y3.d 的所有 (String) -> boolean 校验方法强制返回 true，
+     * 彻底解除应用副屏/小窗限制，支持任意第三方应用（如 QQ、微信）。
+     */
+    private static void hookSupportSubScreen(XposedModule module, ClassLoader cl) {
+        try {
+            Class<?> w3c = cl.loadClass("W3.c");
+            Method oMethod = w3c.getDeclaredMethod("o");
+            oMethod.setAccessible(true);
+            module.hook(oMethod)
+                .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                .intercept(chain -> true);
+            MainModule.log("Hooked W3.c.o() -> true (enable all apps subscreen)");
+        } catch (Throwable t) {
+            MainModule.log("Failed to hook W3.c.o: " + t.getMessage());
+        }
+
+        try {
+            Class<?> y3d = cl.loadClass("Y3.d");
+            for (Method m : y3d.getDeclaredMethods()) {
+                if (Modifier.isStatic(m.getModifiers()) &&
+                    m.getReturnType() == boolean.class &&
+                    m.getParameterTypes().length == 1 &&
+                    m.getParameterTypes()[0] == String.class) {
+                    m.setAccessible(true);
+                    module.hook(m)
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(chain -> true);
+                    MainModule.log("Hooked Y3.d." + m.getName() + "(String) -> true");
+                }
+            }
+        } catch (Throwable t) {
+            MainModule.log("Failed to hook Y3.d: " + t.getMessage());
         }
     }
 }

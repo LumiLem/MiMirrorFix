@@ -13,6 +13,7 @@ public class MirrorHook {
     public static void hook(ClassLoader cl) {
         hookLockPasswordCheck(cl);
         hookTransitionReadyState(cl);
+        hookSupportSubScreen(cl);
     }
 
     /**
@@ -77,6 +78,42 @@ public class MirrorHook {
             } catch (Throwable t) {
                 XposedBridge.log(TAG + "Dynamic scan failed: " + t.getMessage());
             }
+        }
+    }
+
+    /**
+     * 3. 解决“openAppScreen fail, is not SupportSubScreen”导致跨屏从小窗连接后消失的问题
+     * 在旧版系统或非白名单机型上，W3.c.o() 返回 false，导致 Y3.d.i(packageName) 判定应用不支持副屏/小窗投屏，
+     * 从而拒绝拉起并回传错误给接收端。
+     * 将 W3.c.o() 强制返回 true，并将 Y3.d 的应用副屏支持校验方法强制返回 true，放行所有应用（如 QQ、微信等）进行小窗跨屏。
+     */
+    private static void hookSupportSubScreen(ClassLoader cl) {
+        // 1. Hook W3.c.o() -> true (解除整机所有应用副屏限制)
+        try {
+            Class<?> w3c = cl.loadClass("W3.c");
+            Method oMethod = XposedHelpers.findMethodExactIfExists(w3c, "o");
+            if (oMethod != null && oMethod.getReturnType() == boolean.class) {
+                XposedBridge.hookMethod(oMethod, XC_MethodReplacement.returnConstant(true));
+                XposedBridge.log(TAG + "Hooked W3.c.o() -> true (enable all apps subscreen)");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "Failed to hook W3.c.o: " + t.getMessage());
+        }
+
+        // 2. Hook Y3.d 的所有 (String) -> boolean 方法 -> true (放行所有应用的副屏支持与白名单检查)
+        try {
+            Class<?> y3d = cl.loadClass("Y3.d");
+            for (Method m : y3d.getDeclaredMethods()) {
+                if (Modifier.isStatic(m.getModifiers()) &&
+                    m.getReturnType() == boolean.class &&
+                    m.getParameterTypes().length == 1 &&
+                    m.getParameterTypes()[0] == String.class) {
+                    XposedBridge.hookMethod(m, XC_MethodReplacement.returnConstant(true));
+                    XposedBridge.log(TAG + "Hooked Y3.d." + m.getName() + "(String) -> true");
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "Failed to hook Y3.d: " + t.getMessage());
         }
     }
 }
