@@ -29,6 +29,13 @@
 - **解决过渡动画就绪检测死循环**：
   新版调用了 Android 13 `services.jar` 中不存在的私有接口 `IWindowManager.getTransitionReadyState()`，导致旧手机作为发射端时陷入 `retry later`。
   模块 Hook `o4.u0.O()` 强制返回 `true`，直接触发底层任务迁移。
+- **解除副屏应用白名单限制**：
+  在非特定折叠屏/平板或旧系统上，`W3.c.o()` 返回 `false`，导致 `Y3.d` 判定第三方应用（如 QQ、微信）不支持副屏小窗投屏，导致直接中断连接。
+  模块拦截 `W3.c.o()` 与 `Y3.d` 所有支持校验方法强制返回 `true`，解除副屏应用限制。
+- **解决 Android 13 缺失 `ForegroundInfo.mForegroundDisplayId` 导致 NoSuchFieldError 闪退**：
+  新版协同针对 Android 14+ / HyperOS 2.0 增加了多屏感知，在 `G3.h$b.onForegroundInfoChanged` 中直接读取了 `ForegroundInfo.mForegroundDisplayId` 字段。
+  但 Android 13 系统库中无此字段，导致旧手机在响应前台应用变更时在 Binder 线程抛出 `NoSuchFieldError` 并被 `CrashHandler` 强制杀死进程 (`SIG 9`)，表现为“正在连接一会后连接失败”。
+  模块彻底拦截并替换 `onForegroundInfoChanged` 做安全兜底，阻断对缺失字段的访问。
 
 ### 2. 系统核心 (`system_server` / `android`) 底层修复
 - **特权权限提权（绕过 `INTERNAL_SYSTEM_WINDOW` 与 `MANAGE_ACTIVITY_TASKS`）**：
