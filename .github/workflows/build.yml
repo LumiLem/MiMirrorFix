@@ -1,10 +1,9 @@
-name: Build MiMirrorFix APKs
+name: Build & Release MiMirrorFix
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -31,35 +30,34 @@ jobs:
     - name: Build with Gradle
       run: gradle assembleRelease
 
-    - name: Upload Traditional APK
+    - name: Prepare Standard Release Artifacts
+      run: |
+        TAG_NAME="${GITHUB_REF_NAME:-v1.0}"
+        mkdir -p dist
+        cp module-libxposed/build/outputs/apk/release/*.apk dist/MiMirrorFix-${TAG_NAME}-libxposed.apk
+        cp module-traditional/build/outputs/apk/release/*.apk dist/MiMirrorFix-${TAG_NAME}-traditional.apk
+
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: MiMirrorFix-Traditional
-        path: module-traditional/build/outputs/apk/release/*.apk
+        name: MiMirrorFix-APKs
+        path: dist/*.apk
 
-    - name: Upload LibXposed API 102 APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: MiMirrorFix-LibXposed-API102
-        path: module-libxposed/build/outputs/apk/release/*.apk
-
-    - name: Publish to GitHub Release
-      if: github.event_name != 'pull_request'
+    - name: Create Draft Release
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: "v1.0"
-        name: "修复小米跨设备通知 v1.0"
+        name: "修复小米跨设备通知 ${{ github.ref_name }}"
+        draft: true
+        prerelease: false
+        generate_release_notes: true
         body: |
-          ### 修复小米跨设备通知 (MiMirrorFix) v1.0
+          ### 修复小米跨设备通知 (MiMirrorFix) ${{ github.ref_name }}
 
           > **作者**：柠小芒  
           > **描述**：修复低版本 HyperOS/MIUI 跨屏协同通知小窗镜像连接及锁屏密码误报问题
 
           #### 包含产物说明：
-          - **module-libxposed-release.apk**：基于现代化 LibXposed API 102 架构（推荐）
-          - **module-traditional-release.apk**：基于传统 Xposed API 架构
-        files: |
-          module-traditional/build/outputs/apk/release/*.apk
-          module-libxposed/build/outputs/apk/release/*.apk
-        draft: false
-        prerelease: false
+          - **MiMirrorFix-${{ github.ref_name }}-libxposed.apk**：基于现代化 LibXposed API 102 架构（推荐）
+          - **MiMirrorFix-${{ github.ref_name }}-traditional.apk**：基于传统 Xposed API 架构
+        files: dist/*.apk
