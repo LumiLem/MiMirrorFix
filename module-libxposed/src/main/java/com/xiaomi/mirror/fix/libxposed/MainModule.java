@@ -29,6 +29,9 @@ public class MainModule extends XposedModule {
         } else if ("android".equals(packageName)) {
             log("Target loaded: android (system_server)");
             SystemServerHooker.hook(this, classLoader);
+        } else if ("com.milink.service".equals(packageName)) {
+            log("Target loaded: com.milink.service");
+            MilinkHooker.hook(this, classLoader);
         }
     }
 }

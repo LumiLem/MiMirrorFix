@@ -3,9 +3,10 @@
 > **作者**：柠小芒  
 > **描述**：修复低版本 HyperOS/MIUI 跨屏协同通知小窗镜像连接及锁屏密码误报问题
 
-本模块专为 **小米旧机型（HyperOS 1.0 / MIUI 13/14 等）覆盖安装新版协同应用** 后，解决以下两个核心断层问题：
+本模块专为 **小米跨设备互联与跨屏协同服务** 提供增强与修复：
 1. **点击跨设备通知提示“请先设置锁屏密码”**（即使系统已设置过锁屏密码）。
 2. **“新连旧”单向连接失败**（点击通知小窗一直黑屏或卡在“正在连接”，日志陷入 `moveRootTaskToDisplayChecked retry later`）。
+3. **设备互联已连接设备长按删除功能**（妙享桌面、剪贴板流转等页面长按设备项呼出 MIUI 原生确认弹窗，一键删除失效或重复的幽灵设备）。
 
 ---
 
@@ -42,6 +43,12 @@
   系统底层 `ActivityTaskManagerService.moveRootTaskToDisplay(taskId, displayId)` 会校验 `INTERNAL_SYSTEM_WINDOW` 权限，未通过则抛出 `SecurityException`。
   模块在 `system_server` 中接管该方法，通过 `Binder.clearCallingIdentity()` 提升为系统自身权限执行底层 `RootWindowContainer.moveRootTaskToDisplay`，并放行 `enforceTaskPermission`。
 
+### 3. 设备互联 (`com.milink.service`) 页面长按删除支持
+- **统一 UI 风格的设备删除能力**：
+  官方应用内预留了完整的 `deleteDevice` 逻辑与 UI 观察者动画（`MultiFeatureStrategy.onDeviceInfoDeleted`），但未在设置列表项暴露删除入口。
+  模块拦截 `miuix.preference.CheckBoxPreference.onBindViewHolder`，为 `DeviceCheckBoxPreference`（如妙享桌面、剪贴板流转等互联页面中的设备开关项）绑定长按手势（Long Click）。
+  长按时附带震动反馈并拉起原生 `miuix.appcompat.app.AlertDialog` 确认弹窗，确认后调用系统 SettingsProvider 的 `deleteDevice` 接口，列表自动平滑移除设备并永久持久化到底层数据库。
+
 ---
 
 ## 编译与安装说明
@@ -71,12 +78,13 @@
 
 ## 使用与生效配置
 
-1. 将编译好的 APK（选择任一版本即可，推荐使用 `module-libxposed`）安装到**旧手机**上（由于旧手机作为发射端和接收端均存在断层，安装在旧机即可；新手机若也有需要可同样安装）。
+1. 将编译好的 APK（选择任一版本即可，推荐使用 `module-libxposed`）安装到手机上。
 2. 打开 **LSPosed 管理器**：
    - 在模块列表中找到 **“修复小米跨设备通知”** 并启用。
-   - 确认作用域中勾选了：
-     - **系统框架 (android)**
-     - **跨屏协同服务 (com.xiaomi.mirror)**
-3. **重启手机**使 `system_server` 挂钩生效。
-4. 在两台手机上双向测试点击通知，即可秒进应用小窗镜像！
+   - 模块已内置静态作用域配置（`staticScope=true`），激活后 LSPosed 将自动且仅锁定勾选以下 3 个目标应用：
+     - **系统框架 (`android`)**
+     - **跨屏协同服务 (`com.xiaomi.mirror`)**
+     - **设备互联 (`com.milink.service`)**
+3. **重启手机**使 `system_server` 挂钩生效（若仅使用设备互联长按删除功能，在后台强行停止“设备互联”与“设置”应用即可立即生效）。
+4. 进入 **设置 -> 妙享桌面**（或其他互联功能页面），长按任意设备即可弹出原生 MIUI 确认框一键移除！
 

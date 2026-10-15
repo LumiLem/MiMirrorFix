@@ -16,6 +16,9 @@ public class MainHook implements IXposedHookLoadPackage {
         } else if ("android".equals(lpparam.packageName)) {
             XposedBridge.log(TAG + "Target loaded: android (system_server)");
             SystemServerHook.hook(lpparam.classLoader);
+        } else if ("com.milink.service".equals(lpparam.packageName)) {
+            XposedBridge.log(TAG + "Target loaded: com.milink.service");
+            MilinkHook.hook(lpparam.classLoader);
         }
     }
 }
