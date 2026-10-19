@@ -10,3 +10,7 @@
 local.properties
 /releases/
 *.apk
+*.jks
+*.keystore
+*.p12
+release_jks_base64.txt
